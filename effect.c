@@ -16,14 +16,14 @@ const UWORD depth = 4;
 const UWORD screenWidth = 320;
 const UWORD screenByteWidth = screenWidth / 8;
 const UWORD screenHeight = 256;
+const UWORD vertSpeed = 4;
 
 // Naive 15 color can do 46 lines.
-const UWORD fadeOutHeight = 46; 
+const UWORD fadeOutHeight = 195; 
 ULONG screenSize = (screenWidth/8) * screenHeight * (depth); // One extra depth for carry
 UBYTE *buf0;
 UBYTE *buf1;
 UBYTE *buf;
-UBYTE *carry;
 
 __attribute__((always_inline)) inline void WaitBlt() {
 	UWORD tst=*(volatile UWORD*)&custom->dmaconr; //for compatiblity a1000
@@ -31,11 +31,19 @@ __attribute__((always_inline)) inline void WaitBlt() {
 	while (*(volatile UWORD*)&custom->dmaconr&(1<<14)) {} //blitter busy wait
 }
 
+ULONG v = 12323;
+ULONG u = 3321;
+
+ULONG random() {
+    v = 36969*(v & 65535) + (v >> 16);
+    u = 18000*(u & 65535) + (u >> 16);
+    return (v << 16) + (u & 65535);
+}
+
 void InitEffect() {
-    buf0 = AllocMem(screenSize, MEMF_CHIP | MEMF_CLEAR);
-    buf1 = AllocMem(screenSize, MEMF_CHIP);
+    buf0 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
+    buf1 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
     buf = buf0;
-    carry = AllocMem(screenByteWidth * screenHeight, MEMF_CHIP);
     custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
    	SetupScreen(buf0);
 }
@@ -44,7 +52,6 @@ void InitEffect() {
 void FreeEffect() {
     FreeMem(buf0, screenSize);
     FreeMem(buf1, screenSize);
-    FreeMem(carry, screenByteWidth * screenHeight);
 }
 
 const UWORD bobByteWidth = 6;
@@ -53,183 +60,79 @@ const UWORD bobDepth = 4;
 
 INCBIN_CHIP(bob, "bob.bpl")
 
+void PrepBlitCircle() {
+    WaitBlt();
+    custom->bltamod = bobByteWidth;
+    custom->bltbmod = bobByteWidth;
+    custom->bltcmod = screenByteWidth - bobByteWidth;
+    custom->bltdmod = screenByteWidth - bobByteWidth;
+    custom->bltafwm = 0xffff;
+    custom->bltalwm = 0xffff;
+
+}
 void BlitCircle(UBYTE *buf, UWORD x, UWORD y) {
     UWORD shift = x & 0x0f;
     UBYTE *dst = ((UBYTE*)buf) + y * screenByteWidth * depth + ((x >> 3)& 0xffe);
     WaitBlt();
-    custom->bltcon0 = 0xfc | SRCA | SRCB | DEST | ( shift << ASHIFTSHIFT);
-    custom->bltcon1 = 0;
+    custom->bltcon0 = 0xe2 | SRCA | SRCB | SRCC | DEST | ( shift << ASHIFTSHIFT);
+    custom->bltcon1 = shift << BSHIFTSHIFT;
     custom->bltapt = (APTR)bob;
-    custom->bltamod = 0;
-    custom->bltbpt = dst;
-    custom->bltbmod = screenByteWidth - bobByteWidth;
+    custom->bltbpt = (APTR)bob + bobByteWidth;
+    custom->bltcpt = dst;
     custom->bltdpt = dst;
-    custom->bltdmod = screenByteWidth - bobByteWidth;
-    custom->bltafwm = 0xffff;
-    custom->bltalwm = 0xffff;
     custom->bltsize = (((bobHeight * depth)<< HSIZEBITS) ) | ((bobByteWidth / 2));    
 }
 
-// DST -> A, C -> B, DST ->D
-// Bit 0
-// A|bC
-// 0|11
-// 1|00
-// Bit 1,2,3(no Carry)
-// AC|bC 
-// 00|11
-// 01|01
-// 10|00
-// 11|11
-
-void FadeOut(UBYTE *buf) {
+void BlitCircle2(UBYTE *buf, UWORD x, UWORD y) {
+    UWORD shift = x & 0x0f;
+    UBYTE *bob2 = bob + (bobByteWidth * bobHeight * bobDepth * 2);
+    UBYTE *dst = ((UBYTE*)buf) + y * screenByteWidth * depth + ((x >> 3)& 0xffe);
     WaitBlt();
-    WORD bltSize = (fadeOutHeight << HSIZEBITS) | screenByteWidth/2;
+    custom->bltcon0 = 0xe2 | SRCA | SRCB | SRCC | DEST | ( shift << ASHIFTSHIFT);
+    custom->bltcon1 = shift << BSHIFTSHIFT;
+    custom->bltapt = (APTR)bob2;
+    custom->bltbpt = (APTR)bob2 + bobByteWidth;
+    custom->bltcpt = dst;
+    custom->bltdpt = dst;
+    custom->bltsize = (((bobHeight * depth)<< HSIZEBITS) ) | ((bobByteWidth / 2));    
+}
+
+// Color rotation 6>12>3>7>15>14>13>10>4>8>0
+// 2>4
+// 9>3
+// 5>11>7
+
+void FadeOut(UBYTE *src, UBYTE *dst) {
+    WORD bltSize = ((fadeOutHeight- vertSpeed) << HSIZEBITS) | screenByteWidth/2;    
     WORD imageMod = (depth-1) * screenByteWidth;
 
+    WaitBlt();
     custom->bltafwm = 0xffff;
     custom->bltalwm = 0xffff;
     custom->bltcon1 = 0;
-    // bit 0
-    custom->bltcon0 = 0x0f | SRCA | DEST;
-    custom->bltapt = buf;
-    custom->bltamod = imageMod;    
-    custom->bltdpt = buf;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // carry 0
-    custom->bltapt = buf;
-    custom->bltamod = imageMod;
-    custom->bltdpt = carry;
-    custom->bltdmod = 0;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // bit 1
-    custom->bltcon0 = 0xc3 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // carry 1
-    custom->bltcon0 = 0xcf | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = carry;
-    custom->bltdmod = 0;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // bit 2
-    custom->bltcon0 = 0xc3 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth*2;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth*2;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // carry 2
-    custom->bltcon0 = 0xcf | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth*2;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = carry;
-    custom->bltdmod = 0;
-    custom->bltsize = bltSize;
-    WaitBlt();
-    // bit 3
-    custom->bltcon0 = 0xc3 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth*3;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth*3;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;    
-    WaitBlit();
-    // Turn all whites into blacks.
-    // First pass with 3 planes
-    custom->bltcon0 = 0x80 | SRCA | SRCB | SRCC | DEST;
-    custom->bltapt = buf;
-    custom->bltamod = imageMod;
-    custom->bltbpt = buf + screenByteWidth;
-    custom->bltbmod = imageMod;
-    custom->bltcpt = buf + screenByteWidth*2;
-    custom->bltcmod = imageMod;
-    custom->bltdpt = carry;
-    custom->bltdmod = 0;
-    custom->bltsize = bltSize;
-    WaitBlit();
-    // Second pass, 4th plane plus carry
-    custom->bltcon0 = 0xc0 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth * 3;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = carry;
-    custom->bltdmod = 0;
-    custom->bltsize = bltSize;
-    WaitBlit();
-    // now do 4 passes to mask off what we have as 1 in the carry
-    custom->bltcon0 = 0x30 | SRCA | SRCB | DEST;
-    custom->bltapt = buf;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlit();
-    custom->bltcon0 = 0x30 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth * 1;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth * 1;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlit();
-    custom->bltcon0 = 0x30 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth * 2;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth * 2;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    WaitBlit();
-    custom->bltcon0 = 0x30 | SRCA | SRCB | DEST;
-    custom->bltapt = buf + screenByteWidth * 3;
-    custom->bltamod = imageMod;
-    custom->bltbpt = carry;
-    custom->bltbmod = 0;
-    custom->bltdpt = buf + screenByteWidth * 3;
-    custom->bltdmod = imageMod;
-    custom->bltsize = bltSize;
-    
-
-    
-}
-
-void PlaneCopy(UBYTE *from, UBYTE *to) {
-    WaitBlit();
+    // Copy 3 planes (0,1,2) over to the destination buffer (1,2,3)
     custom->bltcon0 = 0xf0 | SRCA | DEST;
-    custom->bltcon1 = 0;
-    custom->bltapt = from;
-    custom->bltamod = 0;
-    custom->bltdpt = to;
-    custom->bltdmod = 0;
-    custom->bltsize = ((fadeOutHeight * depth) << HSIZEBITS) | screenByteWidth/2;
-    
+    custom->bltapt = src;
+    custom->bltamod = screenByteWidth;
+    custom->bltdpt = dst + screenByteWidth + (screenByteWidth * depth * vertSpeed);
+    custom->bltdmod = screenByteWidth;
+    custom->bltsize = ((fadeOutHeight- vertSpeed) << HSIZEBITS) | ((screenByteWidth/2) * 3);
+    WaitBlt();
+    // Calculate the last plane
+    // plane 0 in dest = (bit 0(A) & bit 2(B) ) | bit 3(C);
+    // 0xea
+    custom->bltcon0 = 0x78 | SRCA | SRCB | SRCC | DEST;
+    custom->bltapt = src;
+    custom->bltamod = imageMod;
+    custom->bltbpt = src + screenByteWidth * 2;
+    custom->bltbmod = imageMod;
+    custom->bltcpt = src + screenByteWidth * 3;
+    custom->bltcmod = imageMod;
+    custom->bltdpt = dst + (screenByteWidth * depth * vertSpeed);
+    custom->bltdmod = imageMod;
+    custom->bltsize = bltSize;
 }
+
 
 static const UWORD sinus32[] = {
     16, 18, 19, 21, 22, 24, 25, 26, 
@@ -261,21 +164,42 @@ void CalcEffect() {
         buf = buf0;
         frontBuf = buf1;
     }
-
-    SetPlanes(frontBuf);
-    PlaneCopy(frontBuf, buf);
+    SetPlanes(frontBuf);    
+    FadeOut(frontBuf, buf);
 
 
     frame++;
-    UWORD pos = frame;
-    
+    UWORD pos = frame;    
     UWORD sin = sinus256[pos&0x3f];    
     UWORD sin2 = sinus32[pos&0x3f];    
     UWORD cos = sinus32[(pos+16)&0x3f];    
 
-    FadeOut(buf);
-    BlitCircle(buf, (UWORD)0+sin, (UWORD)0+cos);
-    BlitCircle(buf, (UWORD)256-sin, (UWORD)0+cos);
-    BlitCircle(buf, (UWORD)96+sin2, (UWORD)32-cos);
-    BlitCircle(buf, (UWORD)160-sin2, (UWORD)32-cos);
+    PrepBlitCircle();
+    // for ( int t = 0; t<8; t++) {
+    //     UWORD x = random() & 0xff;
+    //     UWORD y = random() % (fadeOutHeight-32);
+    //     BlitCircle(buf, (UWORD)x, (UWORD)y);
+    // }
+
+
+    BlitCircle(buf, (UWORD)0+sin, (UWORD)0+cos + 4);
+    BlitCircle(buf, (UWORD)256-sin, (UWORD)0+cos + 4);
+    BlitCircle(buf, (UWORD)96+sin2, (UWORD)32-cos + 4);
+    BlitCircle(buf, (UWORD)160-sin2, (UWORD)32-cos + 4);
+    // BlitCircle(buf, (UWORD)0+sin, (UWORD)100+cos + 4);
+    // BlitCircle(buf, (UWORD)256-sin, (UWORD)100+ -cos + 4);
+    // UWORD co = frame & 0x3f;
+    // cos = sinus32[(pos+0)&0x3f];
+    // BlitCircle(buf, (UWORD)co, (UWORD)100+ cos);
+    // BlitCircle2(buf, (UWORD)co+196, (UWORD)60+ cos);
+    // cos = sinus32[(pos+16)&0x3f];
+    // BlitCircle(buf, (UWORD)co+64, (UWORD)100+ cos);
+    // BlitCircle2(buf, (UWORD)co, (UWORD)60+ cos);
+    // cos = sinus32[(pos+32)&0x3f];
+    // BlitCircle(buf, (UWORD)co+128, (UWORD)100+ cos);
+    // BlitCircle2(buf, (UWORD)co+64, (UWORD)60+ cos);
+    // cos = sinus32[(pos+48)&0x3f];
+    // BlitCircle(buf, (UWORD)co+196, (UWORD)100+ cos);    
+    // BlitCircle2(buf, (UWORD)co+128, (UWORD)60+ cos);
+    // //BlitCircle(buf, co, co);
 }

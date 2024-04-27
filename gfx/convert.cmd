@@ -1,1 +1,1 @@
-kingcon bob.png ..\bob -Interleaved -Format=4
+kingcon bob.png ..\bob -Interleaved -Mask -Format=4

@@ -51,6 +51,29 @@ __attribute__((always_inline)) inline USHORT* copSetColor(USHORT* copListCurrent
 	return copListCurrent;
 }
 
+// Color rotation 6>12>3>7>15>14>13>10>4>8>0
+// 2>4
+// 9>3
+// 5>11>7
+const UWORD colors[] = {
+    0x000, // 0
+    0xfee, // 1
+    0x666, // 2
+    0xccc, // 3
+    0x555, // 4
+    0x7f7, // 5
+    0xfff, // 6
+    0xbbb, // 7
+    0x333, // 8
+    0xddd, // 9
+    0x777, // 10
+    0x2e2, // 11
+    0xeee, // 12
+    0x888, // 13
+    0x999, // 14
+    0xaaa, // 15
+};
+
 void SetupScreen(APTR image) {
    	USHORT* copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
 	USHORT* copPtr = copper1;
@@ -82,7 +105,7 @@ void SetupScreen(APTR image) {
 
    	// set colors
 	for(int a=0; a < 16; a++)
-		copPtr = copSetColor(copPtr, a, ((USHORT)(a | a<<4 | a<<8)));
+		copPtr = copSetColor(copPtr, a, colors[a]);
 
     // terminate copper list
     *copPtr++ = 0xffff;
