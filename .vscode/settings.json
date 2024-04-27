@@ -1,0 +1,15 @@
+{
+    "m68k.includePaths": [
+        "c:\\Users\\anton\\.vscode\\extensions\\bartmanabyss.amiga-debug-1.7.7\\bin\\win32\\opt\\m68k-amiga-elf\\sys-include"
+    ],
+    "[m68k]": {
+        "editor.rulers": []
+    },
+    "m68k.vasm.provideDiagnostics": false,
+    "files.associations": {
+        "execbase.h": "c",
+        "gfxmacros.h": "c",
+        "hardware.h": "c",
+        "ports.h": "c"
+    }
+}
