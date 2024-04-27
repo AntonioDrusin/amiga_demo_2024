@@ -1,8 +1,8 @@
 #pragma once
 #include <exec/types.h>
 
-APTR GetEffectBitplanes();
+void InitEffect();
 
-void FreeMemory();
+void FreeEffect();
 
 void CalcEffect();

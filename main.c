@@ -11,6 +11,7 @@
 #include <hardware/intbits.h>
 #include "effect.h"
 #include "hardware.h"
+#include "screen.h"
 //config
 // #define MUSIC
 
@@ -194,6 +195,7 @@ static __attribute__((interrupt)) void interruptHandler() {
 
 
 static void Wait10() { WaitLine(0x10); }
+static void WaitBOF() { WaitLine(254); }
 
 
 int main() {
@@ -221,8 +223,7 @@ int main() {
 	WaitVbl();
 
 
-	APTR image = GetEffectBitplanes();
-	SetupScreen(image);
+	InitEffect();
 
 	custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 
@@ -234,11 +235,11 @@ int main() {
 
 	UWORD value = 0;
 	while(!MouseLeft()) {
-		Wait10();
+		WaitBOF();		
 		CalcEffect();
 	}
 
-	FreeMemory();
+	FreeEffect();
 	// END
 	FreeSystem();
 
