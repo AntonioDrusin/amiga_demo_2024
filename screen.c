@@ -7,12 +7,12 @@
 #include <hardware/dmabits.h>
 #include "hardware.h"
 
-const UWORD screenDepth = 4;
-const UWORD lineSize = 320/8;
-UWORD *copperPlanes;
+static const UWORD screenDepth = 4;
+static const UWORD lineSize = 320/8;
+static UWORD *copperPlanes;
 
 // set up a 320x256 lowres display
-__attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListEnd) {
+static __attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListEnd) {
 	const USHORT x=129;
 	const USHORT width=320;
 	const USHORT height=256;
@@ -33,7 +33,7 @@ __attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListE
 	return copListEnd;
 }
 
-__attribute__((always_inline)) inline USHORT* copSetPlanes(UBYTE bplPtrStart,USHORT* copListEnd,const UBYTE **planes,int numPlanes) {
+static __attribute__((always_inline)) inline USHORT* copSetPlanes(UBYTE bplPtrStart,USHORT* copListEnd,const UBYTE **planes,int numPlanes) {
 	for (USHORT i=0;i<numPlanes;i++) {
 		ULONG addr=(ULONG)planes[i];
 		*copListEnd++=offsetof(struct Custom, bplpt[0]) + (i + bplPtrStart) * sizeof(APTR);
@@ -45,7 +45,7 @@ __attribute__((always_inline)) inline USHORT* copSetPlanes(UBYTE bplPtrStart,USH
 }
 
 
-__attribute__((always_inline)) inline USHORT* copSetColor(USHORT* copListCurrent,USHORT index,USHORT color) {
+static __attribute__((always_inline)) inline USHORT* copSetColor(USHORT* copListCurrent,USHORT index,USHORT color) {
 	*copListCurrent++=offsetof(struct Custom, color) + sizeof(UWORD) * index;
 	*copListCurrent++=color;
 	return copListCurrent;
@@ -55,31 +55,52 @@ __attribute__((always_inline)) inline USHORT* copSetColor(USHORT* copListCurrent
 // 2>4
 // 9>3
 // 5>11>7
-const UWORD colors[] = {
+static const UWORD colors[] = {
     0x000, // 0
-    0xfee, // 1
-    0x666, // 2
-    0xccc, // 3
-    0x555, // 4
-    0x7f7, // 5
-    0xfff, // 6
-    0xbbb, // 7
-    0x333, // 8
-    0xddd, // 9
-    0x777, // 10
-    0x2e2, // 11
-    0xeee, // 12
-    0x888, // 13
-    0x999, // 14
-    0xaaa, // 15
+    0x999, // 1
+    0x886, // 2
+    0xccf, // 3
+    0xaa8, // 4
+    0x774, // 5
+    0x551, // 6
+    0xbbe, // 7
+    0x220, // 8
+    0x997, // 9
+    0xbba, // 10
+    0x663, // 11
+    0x440, // 12
+    0xbbc, // 13
+    0xbbd, // 14
+    0xccf, // 15
 };
 
+static const UWORD colors1[] = {
+    0x000, // 0
+    0x999, // 1
+    0x888, // 2
+    0xfff, // 3
+    0xaaa, // 4
+    0x777, // 5
+    0x555, // 6
+    0xeee, // 7
+    0x222, // 8
+    0x999, // 9
+    0xbbb, // 10
+    0x666, // 11
+    0x444, // 12
+    0xccc, // 13
+    0xddd, // 14
+    0xfff, // 15
+};
+
+static USHORT* copper1 = NULL;
+
 void SetupScreen(APTR image) {
-   	USHORT* copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
+   	copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
 	USHORT* copPtr = copper1;
 
   	// register graphics resources with WinUAE for nicer gfx debugger experience
-	debug_register_copperlist(copper1, "copper1", 1024, 0);
+	//debug_register_copperlist(copper1, "copper1", 1024, 0);
 
 	copPtr = screenScanDefault(copPtr);
 	//enable bitplanes	
@@ -115,6 +136,10 @@ void SetupScreen(APTR image) {
     custom->cop1lc = (ULONG)copper1;
     custom->dmacon = DMAF_BLITTER;//disable blitter dma for copjmp bug
 	custom->copjmp1 = 0x7fff; //start coppper
+}
+
+void CleanupScreen() {
+	FreeMem(copper1, 1024);
 }
 
 void SetPlanes(APTR image) {

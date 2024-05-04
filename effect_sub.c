@@ -8,7 +8,7 @@
 #include <proto/graphics.h>
 #include <graphics/gfxbase.h>
 #include <graphics/view.h>
-#include "effect.h"
+#include "effect_sub.h"
 #include "hardware.h"
 #include "screen.h"
 
@@ -34,25 +34,12 @@ __attribute__((always_inline)) inline void WaitBlt() {
 ULONG v = 12323;
 ULONG u = 3321;
 
-ULONG random() {
+static ULONG random() {
     v = 36969*(v & 65535) + (v >> 16);
     u = 18000*(u & 65535) + (u >> 16);
     return (v << 16) + (u & 65535);
 }
 
-void InitEffect() {
-    buf0 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
-    buf1 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
-    buf = buf0;
-    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
-   	SetupScreen(buf0);
-}
-
-
-void FreeEffect() {
-    FreeMem(buf0, screenSize);
-    FreeMem(buf1, screenSize);
-}
 
 const UWORD bobByteWidth = 6;
 const UWORD bobHeight = 32;
@@ -60,7 +47,7 @@ const UWORD bobDepth = 4;
 
 INCBIN_CHIP(bob, "bob.bpl")
 
-void PrepBlitCircle() {
+static void PrepBlitCircle() {
     WaitBlt();
     custom->bltamod = bobByteWidth;
     custom->bltbmod = bobByteWidth;
@@ -70,7 +57,7 @@ void PrepBlitCircle() {
     custom->bltalwm = 0xffff;
 
 }
-void BlitCircle(UBYTE *buf, UWORD x, UWORD y) {
+static void BlitCircle(UBYTE *buf, UWORD x, UWORD y) {
     UWORD shift = x & 0x0f;
     UBYTE *dst = ((UBYTE*)buf) + y * screenByteWidth * depth + ((x >> 3)& 0xffe);
     WaitBlt();
@@ -83,7 +70,7 @@ void BlitCircle(UBYTE *buf, UWORD x, UWORD y) {
     custom->bltsize = (((bobHeight * depth)<< HSIZEBITS) ) | ((bobByteWidth / 2));    
 }
 
-void BlitCircle2(UBYTE *buf, UWORD x, UWORD y) {
+static void BlitCircle2(UBYTE *buf, UWORD x, UWORD y) {
     UWORD shift = x & 0x0f;
     UBYTE *bob2 = bob + (bobByteWidth * bobHeight * bobDepth * 2);
     UBYTE *dst = ((UBYTE*)buf) + y * screenByteWidth * depth + ((x >> 3)& 0xffe);
@@ -102,7 +89,7 @@ void BlitCircle2(UBYTE *buf, UWORD x, UWORD y) {
 // 9>3
 // 5>11>7
 
-void FadeOut(UBYTE *src, UBYTE *dst) {
+static void FadeOut(UBYTE *src, UBYTE *dst) {
     WORD bltSize = ((fadeOutHeight- vertSpeed) << HSIZEBITS) | screenByteWidth/2;    
     WORD imageMod = (depth-1) * screenByteWidth;
 
@@ -118,11 +105,10 @@ void FadeOut(UBYTE *src, UBYTE *dst) {
     custom->bltdmod = screenByteWidth;
     custom->bltsize = ((fadeOutHeight- vertSpeed) << HSIZEBITS) | ((screenByteWidth/2) * 3);
     WaitBlt();
-    // Calculate the last plane
-    // plane 0 in dest = (bit 0(A) & bit 2(B) ) | bit 3(C);
-    // 0xea
-    custom->bltcon0 = 0x78 | SRCA | SRCB | SRCC | DEST;
-    custom->bltapt = src;
+    // Calculate the last plane    
+    // plane 0 in dest = minterm * bit 1 A, bit 2 B, bit 3 C
+    custom->bltcon0 = 0x94 | SRCA | SRCB | SRCC | DEST;
+    custom->bltapt = src + screenByteWidth * 1;
     custom->bltamod = imageMod;
     custom->bltbpt = src + screenByteWidth * 2;
     custom->bltbmod = imageMod;
@@ -151,10 +137,27 @@ static const UWORD sinus256[64] = {
     37, 29, 22, 15, 10, 6, 2, 1, 0, 1, 2, 6, 10, 15, 22, 29, 37, 47, 57, 68, 79, 91, 103, 115
 };
 
+// Exported functions
+
+void Sub_InitEffect() {
+    buf0 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
+    buf1 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
+    buf = buf0;
+    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
+   	SetupScreen(buf0);
+}
+
+
+void Sub_FreeEffect() {
+    FreeMem(buf0, screenSize);
+    FreeMem(buf1, screenSize);
+    CleanupScreen();
+}
 
 UWORD frame = 0;
+UWORD dir = 1;
 
-void CalcEffect() {
+BOOL Sub_CalcEffect(BOOL exit) {
     UBYTE *frontBuf;
     if ( buf == buf0 ) {
         buf = buf1;
@@ -164,11 +167,12 @@ void CalcEffect() {
         buf = buf0;
         frontBuf = buf1;
     }
-    SetPlanes(frontBuf);    
+    SetPlanes(frontBuf);
     FadeOut(frontBuf, buf);
 
 
-    frame++;
+    frame+=dir;
+    if ( frame >= 70 || frame <= 0) dir = -dir;
     UWORD pos = frame;    
     UWORD sin = sinus256[pos&0x3f];    
     UWORD sin2 = sinus32[pos&0x3f];    
@@ -186,20 +190,21 @@ void CalcEffect() {
     BlitCircle(buf, (UWORD)256-sin, (UWORD)0+cos + 4);
     BlitCircle(buf, (UWORD)96+sin2, (UWORD)32-cos + 4);
     BlitCircle(buf, (UWORD)160-sin2, (UWORD)32-cos + 4);
-    // BlitCircle(buf, (UWORD)0+sin, (UWORD)100+cos + 4);
-    // BlitCircle(buf, (UWORD)256-sin, (UWORD)100+ -cos + 4);
-    // UWORD co = frame & 0x3f;
-    // cos = sinus32[(pos+0)&0x3f];
-    // BlitCircle(buf, (UWORD)co, (UWORD)100+ cos);
-    // BlitCircle2(buf, (UWORD)co+196, (UWORD)60+ cos);
-    // cos = sinus32[(pos+16)&0x3f];
-    // BlitCircle(buf, (UWORD)co+64, (UWORD)100+ cos);
-    // BlitCircle2(buf, (UWORD)co, (UWORD)60+ cos);
-    // cos = sinus32[(pos+32)&0x3f];
-    // BlitCircle(buf, (UWORD)co+128, (UWORD)100+ cos);
-    // BlitCircle2(buf, (UWORD)co+64, (UWORD)60+ cos);
-    // cos = sinus32[(pos+48)&0x3f];
-    // BlitCircle(buf, (UWORD)co+196, (UWORD)100+ cos);    
-    // BlitCircle2(buf, (UWORD)co+128, (UWORD)60+ cos);
-    // //BlitCircle(buf, co, co);
+    BlitCircle(buf, (UWORD)0+sin, (UWORD)100+cos + 4);
+    BlitCircle(buf, (UWORD)256-sin, (UWORD)100+ -cos + 4);
+    UWORD co = frame & 0x3f;
+    cos = sinus32[(pos+0)&0x3f];
+    BlitCircle(buf, (UWORD)co, (UWORD)100+ cos);
+    BlitCircle2(buf, (UWORD)co+196, (UWORD)60+ cos);
+    cos = sinus32[(pos+16)&0x3f];
+    BlitCircle(buf, (UWORD)co+64, (UWORD)100+ cos);
+    BlitCircle2(buf, (UWORD)co, (UWORD)60+ cos);
+    cos = sinus32[(pos+32)&0x3f];
+    BlitCircle(buf, (UWORD)co+128, (UWORD)100+ cos);
+    BlitCircle2(buf, (UWORD)co+64, (UWORD)60+ cos);
+    cos = sinus32[(pos+48)&0x3f];
+    BlitCircle(buf, (UWORD)co+196, (UWORD)100+ cos);    
+    BlitCircle2(buf, (UWORD)co+128, (UWORD)60+ cos);
+    //BlitCircle(buf, co, co);
+    return TRUE;
 }

@@ -9,11 +9,11 @@
 #include <hardware/custom.h>
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
-#include "effect.h"
+#include "effect_sub.h"
+#include "effect_add.h"
 #include "hardware.h"
 #include "screen.h"
 //config
-// #define MUSIC
 
 struct ExecBase *SysBase;
 struct DosLibrary *DOSBase;
@@ -198,6 +198,27 @@ static void Wait10() { WaitLine(0x10); }
 static void WaitBOF() { WaitLine(254); }
 
 
+typedef struct DemoEffect{
+	void (* initialize)();
+	void (* cleanup)();
+	BOOL (* effect)(BOOL);
+} DemoEffect;
+
+static const UWORD effectCount = 2;
+static DemoEffect effects[] = {
+	{
+		.initialize = Sub_InitEffect,
+		.cleanup = Sub_FreeEffect,
+		.effect = Sub_CalcEffect
+	},
+	{
+		.initialize = Add_InitEffect,
+		.cleanup = Add_FreeEffect,
+		.effect = Add_CalcEffect
+	}
+};
+
+
 int main() {
 	SysBase = *((struct ExecBase**)4UL);
 
@@ -211,35 +232,38 @@ int main() {
 	if (!DOSBase)
 		Exit(0);
 
-	warpmode(1);
-	// TODO: precalc stuff here
-#ifdef MUSIC
-	if(p61Init(module) != 0)
-		KPrintF("p61Init failed!\n");
-#endif
-	warpmode(0);
-
 	TakeSystem();
 	WaitVbl();
-
-
-	InitEffect();
+	
+	custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
+	custom->dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
+	// DEMO
+	UWORD currentEffect = 0;	
+	effects[currentEffect].initialize();
 
 	custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
-
-	// DEMO
 	SetInterruptHandler((APTR)interruptHandler);
 	custom->intena = INTF_SETCLR | INTF_INTEN | INTF_VERTB;
-
 	custom->intreq=(1<<INTB_VERTB);//reset vbl req
-
-	UWORD value = 0;
-	while(!MouseLeft()) {
+	
+	while(!MouseRight()) {
 		WaitBOF();		
-		CalcEffect();
+		if ( MouseLeft() ) {
+			currentEffect++;
+			if ( currentEffect >= effectCount ) {
+				break;
+			}
+			effects[currentEffect-1].cleanup();
+			custom->dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
+			effects[currentEffect].initialize();
+			custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
+		}
+		effects[currentEffect].effect(TRUE);		
+		//Sub_CalcEffect(TRUE);
 	}
+	effects[currentEffect-1].cleanup();
 
-	FreeEffect();
+
 	// END
 	FreeSystem();
 
