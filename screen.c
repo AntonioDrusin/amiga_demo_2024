@@ -7,9 +7,6 @@
 #include <hardware/dmabits.h>
 #include "hardware.h"
 
-static const UWORD screenDepth = 4;
-static const UWORD lineSize = 320/8;
-static UWORD *copperPlanes;
 
 // set up a 320x256 lowres display
 static __attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListEnd) {
@@ -94,8 +91,12 @@ static const UWORD colors1[] = {
 };
 
 static USHORT* copper1 = NULL;
+static UWORD screenDepth = 4;
+static UWORD *copperPlanes;
+static const UWORD lineSize = 320/8;
 
-void SetupScreen(APTR image) {
+void SetupScreen(APTR image, UWORD depth) {
+	screenDepth = depth;
    	copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
 	USHORT* copPtr = copper1;
 
@@ -136,6 +137,7 @@ void SetupScreen(APTR image) {
     custom->cop1lc = (ULONG)copper1;
     custom->dmacon = DMAF_BLITTER;//disable blitter dma for copjmp bug
 	custom->copjmp1 = 0x7fff; //start coppper
+	KPrintF("Copper list length: %ld", (ULONG)(copPtr-copper1));
 }
 
 void CleanupScreen() {

@@ -72,7 +72,7 @@ static void BlitCircle(UBYTE *buf, UWORD x, UWORD y) {
 
 static void BlitCircle2(UBYTE *buf, UWORD x, UWORD y) {
     UWORD shift = x & 0x0f;
-    UBYTE *bob2 = bob + (bobByteWidth * bobHeight * bobDepth * 2);
+    UBYTE *bob2 = (UBYTE *)bob + (bobByteWidth * bobHeight * bobDepth * 2);
     UBYTE *dst = ((UBYTE*)buf) + y * screenByteWidth * depth + ((x >> 3)& 0xffe);
     WaitBlt();
     custom->bltcon0 = 0xe2 | SRCA | SRCB | SRCC | DEST | ( shift << ASHIFTSHIFT);
@@ -144,7 +144,7 @@ void Sub_InitEffect() {
     buf1 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
     buf = buf0;
     custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
-   	SetupScreen(buf0);
+   	SetupScreen(buf0, 4);
 }
 
 
@@ -168,6 +168,7 @@ BOOL Sub_CalcEffect(BOOL exit) {
         frontBuf = buf1;
     }
     SetPlanes(frontBuf);
+
     FadeOut(frontBuf, buf);
 
 
@@ -179,12 +180,6 @@ BOOL Sub_CalcEffect(BOOL exit) {
     UWORD cos = sinus32[(pos+16)&0x3f];    
 
     PrepBlitCircle();
-    // for ( int t = 0; t<8; t++) {
-    //     UWORD x = random() & 0xff;
-    //     UWORD y = random() % (fadeOutHeight-32);
-    //     BlitCircle(buf, (UWORD)x, (UWORD)y);
-    // }
-
 
     BlitCircle(buf, (UWORD)0+sin, (UWORD)0+cos + 4);
     BlitCircle(buf, (UWORD)256-sin, (UWORD)0+cos + 4);

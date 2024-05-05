@@ -10,7 +10,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "effect_sub.h"
-#include "effect_add.h"
+#include "effect_fire.h"
 #include "hardware.h"
 #include "screen.h"
 //config
@@ -207,14 +207,14 @@ typedef struct DemoEffect{
 static const UWORD effectCount = 2;
 static DemoEffect effects[] = {
 	{
+		.initialize = Fire_InitEffect,
+		.cleanup = Fire_FreeEffect,
+		.effect = Fire_CalcEffect
+	},
+	{
 		.initialize = Sub_InitEffect,
 		.cleanup = Sub_FreeEffect,
 		.effect = Sub_CalcEffect
-	},
-	{
-		.initialize = Add_InitEffect,
-		.cleanup = Add_FreeEffect,
-		.effect = Add_CalcEffect
 	}
 };
 
@@ -259,7 +259,6 @@ int main() {
 			custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 		}
 		effects[currentEffect].effect(TRUE);		
-		//Sub_CalcEffect(TRUE);
 	}
 	effects[currentEffect-1].cleanup();
 
