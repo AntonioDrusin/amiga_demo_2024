@@ -10,6 +10,7 @@
         "execbase.h": "c",
         "gfxmacros.h": "c",
         "hardware.h": "c",
-        "ports.h": "c"
+        "ports.h": "c",
+        "varargs.h": "c"
     }
 }

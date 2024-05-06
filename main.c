@@ -9,10 +9,12 @@
 #include <hardware/custom.h>
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
+#include <stdarg.h>
 #include "effect_sub.h"
 #include "effect_fire.h"
 #include "hardware.h"
 #include "screen.h"
+#include "tester.h"
 //config
 
 struct ExecBase *SysBase;
@@ -165,38 +167,14 @@ __attribute__((always_inline)) inline USHORT* copWaitY(USHORT* copListEnd,USHORT
 
 UWORD* scroll = NULL;
 
-static const UBYTE sinus15[] = { 
-	8,8,9,10,10,11,12,12,
-	13,13,14,14,14,15,15,15,
-	15,15,15,15,14,14,14,13,
-	13,12,12,11,10,10,9,8,
-	8,7,6,5,5,4,3,3,
-	2,2,1,1,1,0,0,0,
-	0,0,0,0,1,1,1,2,
-	2,3,3,4,5,5,6,7, 
-};
-
-
-static const UBYTE sinus32[] = {
-	16,18,20,22,24,25,27,28,
-	30,30,31,32,32,32,32,31,
-	30,30,28,27,25,24,22,20,
-	18,16,14,12,10,8,7,5,
-	4,2,2,1,0,0,0,0,
-	1,2,2,4,5,7,8,10,
-	12,14,16,
-};
-
 static __attribute__((interrupt)) void interruptHandler() {
 	custom->intreq=(1<<INTB_VERTB); custom->intreq=(1<<INTB_VERTB); //reset vbl req. twice for a4000 bug.
 	// DEMO - increment frameCounter
 	frameCounter++;
 }
 
-
 static void Wait10() { WaitLine(0x10); }
 static void WaitBOF() { WaitLine(254); }
-
 
 typedef struct DemoEffect{
 	void (* initialize)();
@@ -218,19 +196,19 @@ static DemoEffect effects[] = {
 	}
 };
 
-
 int main() {
 	SysBase = *((struct ExecBase**)4UL);
-
 	// We will use the graphics library only to locate and restore the system copper list once we are through.
 	GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library",0);
 	if (!GfxBase)
 		Exit(0);
-
 	// used for printing
 	DOSBase = (struct DosLibrary*)OpenLibrary((CONST_STRPTR)"dos.library", 0);
 	if (!DOSBase)
 		Exit(0);
+
+	// Tester();
+	// Exit(0);
 
 	TakeSystem();
 	WaitVbl();
