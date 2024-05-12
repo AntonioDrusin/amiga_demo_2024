@@ -129,6 +129,7 @@ void FreeSystem() {
 	/*Restore system copper list(s). */
 	custom->cop1lc=(ULONG)GfxBase->copinit;
 	custom->cop2lc=(ULONG)GfxBase->LOFlist;
+	WaitBlit();
 	custom->copjmp1=0x7fff; //start coppper
 
 	/*Restore all interrupts and DMA settings. */
@@ -174,7 +175,7 @@ static __attribute__((interrupt)) void interruptHandler() {
 }
 
 static void Wait10() { WaitLine(0x10); }
-static void WaitBOF() { WaitLine(254); }
+static void WaitBOF() { WaitLine(254+40); }
 
 typedef struct DemoEffect{
 	void (* initialize)();
@@ -213,16 +214,14 @@ int main() {
 	TakeSystem();
 	WaitVbl();
 	
-	custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
-	custom->dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 	// DEMO
 	UWORD currentEffect = 0;	
-	effects[currentEffect].initialize();
-
 	custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 	SetInterruptHandler((APTR)interruptHandler);
 	custom->intena = INTF_SETCLR | INTF_INTEN | INTF_VERTB;
 	custom->intreq=(1<<INTB_VERTB);//reset vbl req
+
+	effects[currentEffect].initialize();
 	
 	while(!MouseRight()) {
 		WaitBOF();		
@@ -232,9 +231,7 @@ int main() {
 				break;
 			}
 			effects[currentEffect-1].cleanup();
-			custom->dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 			effects[currentEffect].initialize();
-			custom->dmacon = DMAF_SETCLR | DMAF_MASTER | DMAF_RASTER | DMAF_COPPER | DMAF_BLITTER;
 		}
 		effects[currentEffect].effect(TRUE);		
 	}

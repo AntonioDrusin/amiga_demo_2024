@@ -135,7 +135,6 @@ void SetupScreen(APTR image, UWORD depth) {
 
     // set copper list
     custom->cop1lc = (ULONG)copper1;
-    custom->dmacon = DMAF_BLITTER;//disable blitter dma for copjmp bug
 	custom->copjmp1 = 0x7fff; //start coppper
 	KPrintF("Copper list length: %ld", (ULONG)(copPtr-copper1));
 }

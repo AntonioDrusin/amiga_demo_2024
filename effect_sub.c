@@ -144,6 +144,7 @@ void Sub_InitEffect() {
     buf1 = AllocMem(screenSize*2, MEMF_CHIP | MEMF_CLEAR);
     buf = buf0;
     custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
+    WaitBlt();
    	SetupScreen(buf0, 4);
 }
 
