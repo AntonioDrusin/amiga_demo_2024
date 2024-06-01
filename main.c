@@ -183,12 +183,17 @@ typedef struct DemoEffect{
 	BOOL (* effect)(BOOL);
 } DemoEffect;
 
-static const UWORD effectCount = 2;
+static const UWORD effectCount = 3;
 static DemoEffect effects[] = {
 	{
 		.initialize = Fire_InitEffect,
 		.cleanup = Fire_FreeEffect,
 		.effect = Fire_CalcEffect
+	},
+	{
+		.initialize = ShaderBob_InitEffect,
+		.cleanup = Fire_FreeEffect,
+		.effect = ShaderBob_CalcEffect
 	},
 	{
 		.initialize = Sub_InitEffect,
@@ -208,8 +213,8 @@ int main() {
 	if (!DOSBase)
 		Exit(0);
 
-	// Tester();
-	// Exit(0);
+	//Tester();
+	//Exit(0);
 
 	TakeSystem();
 	WaitVbl();

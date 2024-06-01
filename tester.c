@@ -109,7 +109,7 @@ static void Calculate(UWORD x, UWORD dx, UWORD width ) {
         UWORD startMaskShift = x & 0x0f;
         UWORD endMaskShift = ((UWORD)(x+width) & 0x0f)-1;
         dest.src = ((UWORD)(x+width-1) / 16) * 2;
-        dest.dst = ((UWORD)(dx+width-1) / 16) * 2;
+        dest.dst = (((UWORD)(dx) / 16) * 2) + srcSize - 2;
         dest.bltafwm = (UWORD)((WORD)0x8000 >> endMaskShift);
         dest.bltalwm = (UWORD)0xffff >> startMaskShift;
         dest.size = srcSize;
@@ -152,10 +152,6 @@ static void Test(UWORD x, UWORD dx, UWORD width) {
     PrintF("Move from %ld to %ld, width: %ld", (LONG)x, (LONG)dx, (LONG)width);
     Calculate(x,dx,width);
 }
-
-// Masks are aplied _BEFORE_ shifts!!
-// ALL the expected are WRONG !!!
-// WAT!
 
 void Tester() {
 	BlitterData expected;
@@ -325,6 +321,19 @@ void Tester() {
     expected.bshift = 13;
     expected.size = 6;
     expected.descending = FALSE;
+    Verify(expected);
+
+    // 0000 1111 1111 1111 | 1111 1111 1111 1111 | 1100 0000 0000 0000 | 0000 0000 0000 0000 |
+    // 0111 1111 1111 1111 | 1111 1111 1111 1110 | 0000 0000 0000 0000 | 0000 0000 0000 0000 |
+    Test(4, 1, 30); // From, To, Width
+    expected.bltafwm = 0xc000;
+    expected.bltalwm = 0x0fff;
+    expected.dst = 4;
+    expected.src = 4;
+    expected.ashift = 3;
+    expected.bshift = 3;
+    expected.size = 6;
+    expected.descending = TRUE;
     Verify(expected);
 
 

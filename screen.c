@@ -54,40 +54,40 @@ static __attribute__((always_inline)) inline USHORT* copSetColor(USHORT* copList
 // 5>11>7
 static const UWORD colors[] = {
     0x000, // 0
-    0x999, // 1
-    0x886, // 2
-    0xccf, // 3
-    0xaa8, // 4
-    0x774, // 5
-    0x551, // 6
-    0xbbe, // 7
-    0x220, // 8
-    0x997, // 9
-    0xbba, // 10
-    0x663, // 11
-    0x440, // 12
-    0xbbc, // 13
-    0xbbd, // 14
-    0xccf, // 15
+    0x53e, // 7
+    0x43f, // 6
+	0x60a, // 13
+    0x52e, // 8
+    0x42d, // 5
+    0x218, // 3
+    0x60a, // 12
+    0x103, // 1
+    0x52e, // 8
+    0x52d, // 9
+    0x32a, // 4
+    0x115, // 2
+    0x51c, // 10
+    0x61b, // 11
+    0x60a, // 13
 };
 
 static const UWORD colors1[] = {
     0x000, // 0
-    0x999, // 1
-    0x888, // 2
-    0xfff, // 3
-    0xaaa, // 4
+    0x999, // 7
+    0x888, // 6
+	0xfff, // 13
+    0xaaa, // 8
     0x777, // 5
-    0x555, // 6
-    0xeee, // 7
-    0x222, // 8
-    0x999, // 9
-    0xbbb, // 10
-    0x666, // 11
-    0x444, // 12
-    0xccc, // 13
-    0xddd, // 14
-    0xfff, // 15
+    0x555, // 3
+    0xeee, // 12
+    0x222, // 1
+    0x999, // 8
+    0xbbb, // 9
+    0x666, // 4
+    0x444, // 2
+    0xccc, // 10
+    0xddd, // 11
+    0xfff, // 13
 };
 
 static USHORT* copper1 = NULL;

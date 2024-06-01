@@ -33,14 +33,14 @@ __attribute__((always_inline)) inline void WaitBlt() {
 	while (*(volatile UWORD*)&custom->dmaconr&(1<<14)) {} //blitter busy wait
 }
 
-// static ULONG v = 12323;
-// static ULONG u = 3321;
+static ULONG v = 12323;
+static ULONG u = 3321;
 
-// static ULONG random() {
-//     v = 36969*(v & 65535) + (v >> 16);
-//     u = 18000*(u & 65535) + (u >> 16);
-//     return (v << 16) + (u & 65535);
-// }
+static ULONG random() {
+    v = 36969*(v & 65535) + (v >> 16);
+    u = 18000*(u & 65535) + (u >> 16);
+    return (v << 16) + (u & 65535);
+}
 
 
 static const UWORD bobByteWidth = 6;
@@ -51,7 +51,7 @@ static UWORD mask = 0xaaaa;
 
 static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
     if ( ((UWORD)(dx & 0x0f)) < ((UWORD)(x & 0x0f ))) {
-        KPrintF("descending");
+        
         // descending never expands number of words
         UWORD srcSize = ((UWORD)((UWORD)(x+width-(UWORD)1) >> 4 ) - (UWORD)(x >> 4)) * (UWORD)2 + (UWORD)2;
         UWORD size = srcSize;
@@ -59,7 +59,7 @@ static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, 
         UWORD startMaskShift = x & 0x0f;
         UWORD endMaskShift = ((UWORD)(x+width) & 0x0f)-1;
         UWORD srcOffset = ((UWORD)(x+width-1) / 16) * 2;
-        UWORD dstOffset = ((UWORD)(dx+width-1) / 16) * 2;
+        UWORD dstOffset = (((UWORD)(dx) / 16) * 2) + size - 2;
         UWORD firstMask = (UWORD)((WORD)0x8000 >> endMaskShift);
         UWORD lastMask = (UWORD)0xffff >> startMaskShift;
 
@@ -118,7 +118,6 @@ static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, 
 
     }
     else {
-        KPrintF("ascending");
         UWORD srcSize = ((UWORD)((UWORD)(x+width-(UWORD)1) >> 4 ) - (UWORD)(x >> 4)) * (UWORD)2 + (UWORD)2;
         UWORD dstSize = ((UWORD)((UWORD)(dx+width-1) >> 4 ) - (UWORD)(dx >> 4)) * (UWORD)2 + (UWORD)2;
         UWORD shift = (UWORD)(dx - x) & 0x0f;
@@ -262,12 +261,26 @@ void Fire_InitEffect() {
     carry = AllocMem(carrySize, MEMF_CHIP | MEMF_CLEAR);
     buf = buf0;
     custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
-    BlitterBox(buf0, 0, 0, 320, 256, 3);
-    BlitterBox(buf1, 0, 0, 320, 256, 3);
+//    BlitterBox(buf0, 0, 0, 320, 256, 3);
+    //BlitterBox(buf1, 0, 0, 320, 256, 3);
     WaitBlt();
    	SetupScreen(buf0, 4);
     mask = 0xaaaa;
 }
+
+void ShaderBob_InitEffect() {
+    buf0 = AllocMem(screenSize, MEMF_CHIP | MEMF_CLEAR);
+    buf1 = AllocMem(screenSize, MEMF_CHIP | MEMF_CLEAR);
+    carry = AllocMem(carrySize, MEMF_CHIP | MEMF_CLEAR);
+    buf = buf0;
+    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
+    BlitterBox(buf0, 0, 0, 320, 256, 3);
+    BlitterBox(buf1, 0, 0, 320, 256, 3);
+    WaitBlt();
+   	SetupScreen(buf0, 4);
+    mask = 0xffff;
+}
+
 
 
 void Fire_FreeEffect() {
@@ -288,20 +301,122 @@ static WORD pw = 22;
 static WORD ph = 22;
 
 
+static const WORD wave0[] = {
+    -1,-3,-1,0,
+    -2,0,1,1,
+    2,1,0,2,
+    0,3,0,-1
+    };
+
+static const WORD wave0b[] = {
+    -2,-3,-2,-1,
+    -2,-1,2,1,
+    2,1,1,2,
+    1,3,4,-1
+    };    
+
+static const WORD wave1[] = {
+    1,3,1,2,
+    2,3,1,1,
+    2,2,1,2,
+    4,3,3,1
+};
+static const WORD wave1b[] = {
+    2,3,1,5,
+    2,3,2,1,
+    2,1,3,1,
+    4,2,1,1
+};
+
+WORD getWaveY() {
+    static UWORD ix = 0;
+    if ( frame & 0x04 ) ix++;
+    return (wave1[ix & 0x0f]);
+
+}
+
+WORD getWaveX() {
+    static UWORD ix = 0;
+    if ( frame % 7 == 0 ) ix++;
+    return (wave0[ix & 0x0f]);
+}
+
 
 BOOL Fire_CalcEffect(BOOL exit) {
-    // UBYTE *frontBuf;
-    // if ( buf == buf0 ) {
-    //     buf = buf1;
-    //     frontBuf = buf0;
-    // }
-    // else {
-    //     buf = buf0;
-    //     frontBuf = buf1;
-    // }
-    // SetPlanes(frontBuf);    
+    UBYTE *frontBuf;
+    if ( buf == buf0 ) {
+        buf = buf1;
+        frontBuf = buf0;
+    }
+    else {
+        buf = buf0;
+        frontBuf = buf1;
+    }
+    SetPlanes(frontBuf);    
     
-    // CopyBuf(frontBuf, buf);
+    CopyBuf(frontBuf, buf);
+
+    mask = mask << 1 | (mask & 0x8000 ? 1:0);
+    //mask = 0xffff;
+
+
+
+    // 3 boxes at the bottom
+    // 20px - 280px - 20px;
+    const UWORD width = 280;
+    const UWORD margin = (320-280)/2;
+    const UWORD heightJump = 17;
+    const UWORD h = 27;
+    UWORD x;
+    UWORD w;
+
+    WaitBlt();
+    UWORD y = 90;
+
+    BlitterBox(buf, 0, y+10, 320, heightJump, 3);
+
+    w = width / 3;    
+    x = margin;
+    for ( UWORD i=0; i<3; i++) {        
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
+
+    // 6 boxes above that
+    y -= heightJump;
+    w = (width) / 6;
+    x = margin;
+    for ( UWORD i=0; i<6; i++) {
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
+     
+    // 12 boxes above those
+    y -= heightJump;
+    w = (width) / 12;
+    x = margin;
+    for ( UWORD i=0; i<12; i++) {
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
+
+    // 24 boxes above those
+    y -= heightJump;
+    w = (width) / 24;
+    x = margin;
+    for ( UWORD i=0; i<24; i++) {
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
+
+    BlitterBox(buf, 0, 90+10, 320, heightJump, 3);
+
+
+
+    frame++;
+}
+
+BOOL ShaderBob_CalcEffect(BOOL exit) {
     px += dx;
     py += dy;
     if ( px < 0 || px+pw > 320) { dx=-dx; px += dx; if ( dx > 0 )  dx++; else dx--;};
