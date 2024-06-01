@@ -331,7 +331,7 @@ static const WORD wave1b[] = {
 WORD getWaveY() {
     static UWORD ix = 0;
     if ( frame & 0x04 ) ix++;
-    return (wave1[ix & 0x0f]);
+    return (wave1[ix & 0x0f])*3;
 
 }
 
@@ -401,11 +401,11 @@ BOOL Fire_CalcEffect(BOOL exit) {
     }
 
     // 24 boxes above those
-    y -= heightJump;
+    y -= heightJump*2;
     w = (width) / 24;
     x = margin;
-    for ( UWORD i=0; i<24; i++) {
-        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+    for ( UWORD i=0; i<25; i++) {
+        Smudge(buf, buf, x, y, w, h*2, x + getWaveX(), y-getWaveY());
         x += w;
     }
 
