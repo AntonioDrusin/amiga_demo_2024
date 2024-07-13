@@ -89,7 +89,7 @@ void TakeSystem() {
 	SystemDMA=custom->dmaconr;
 	ActiView=GfxBase->ActiView; //store current view
 
-	LoadView(0);
+	LoadView(NULL);
 	WaitTOF();
 	WaitTOF();
 
@@ -183,7 +183,7 @@ typedef struct DemoEffect{
 	BOOL (* effect)(BOOL);
 } DemoEffect;
 
-static const UWORD effectCount = 3;
+static const UWORD effectCount = 1;
 static DemoEffect effects[] = {
 	{
 		.initialize = Fire_InitEffect,
@@ -229,7 +229,7 @@ int main() {
 	effects[currentEffect].initialize();
 	
 	while(!MouseRight()) {
-		WaitBOF();		
+		//WaitBOF();
 		if ( MouseLeft() ) {
 			currentEffect++;
 			if ( currentEffect >= effectCount ) {

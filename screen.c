@@ -9,11 +9,13 @@
 
 
 // set up a 320x256 lowres display
-static __attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListEnd) {
-	const USHORT x=129;
-	const USHORT width=320;
-	const USHORT height=256;
-	const USHORT y=44;
+static __attribute__((always_inline)) inline USHORT* screenScanDefault(USHORT* copListEnd, 
+USHORT width, USHORT height) {
+
+	// width != 320 is untested
+
+	const USHORT x=0x81;
+	const USHORT y=0x2c;
 	const USHORT RES=8; //8=lowres,4=hires
 	USHORT xstop = x+width;
 	USHORT ystop = y+height;
@@ -95,15 +97,17 @@ static UWORD screenDepth = 4;
 static UWORD *copperPlanes;
 static const UWORD lineSize = 320/8;
 
-void SetupScreen(APTR image, UWORD depth) {
+
+// width ignored
+void SetupScreenComplete(APTR image, UWORD depth, UWORD width, UWORD height) {
 	screenDepth = depth;
    	copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
 	USHORT* copPtr = copper1;
 
   	// register graphics resources with WinUAE for nicer gfx debugger experience
-	//debug_register_copperlist(copper1, "copper1", 1024, 0);
+	debug_register_copperlist(copper1, "copper1", 1024, 0);
 
-	copPtr = screenScanDefault(copPtr);
+	copPtr = screenScanDefault(copPtr, 320, height);
 	//enable bitplanes	
 	*copPtr++ = offsetof(struct Custom, bplcon0);
 	*copPtr++ = (0<<10)/*dual pf*/|(1<<9)/*color*/|((screenDepth)<<12)/*num bitplanes*/;
@@ -138,6 +142,11 @@ void SetupScreen(APTR image, UWORD depth) {
 	custom->copjmp1 = 0x7fff; //start coppper
 	KPrintF("Copper list length: %ld", (ULONG)(copPtr-copper1));
 }
+
+void SetupScreen(APTR image, UWORD depth) {
+	SetupScreenComplete(image, depth, 0, 160);
+}
+
 
 void CleanupScreen() {
 	FreeMem(copper1, 1024);
