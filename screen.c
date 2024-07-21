@@ -14,10 +14,10 @@ USHORT width, USHORT height) {
 
 	// width != 320 is untested
 
-	const USHORT x=0x81+8;
+	const USHORT x=0x81;
 	const USHORT y=0x2c;
 	const USHORT RES=8; //8=lowres,4=hires
-	USHORT xstop = x+width-8;
+	USHORT xstop = x+width-16;
 	USHORT ystop = y+height;
 	USHORT fw=(x>>1)-RES;
 

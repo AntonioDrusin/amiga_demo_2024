@@ -233,6 +233,7 @@ int main() {
 		if ( MouseLeft() ) {
 			currentEffect++;
 			if ( currentEffect >= effectCount ) {
+				currentEffect--;
 				break;
 			}
 			effects[currentEffect-1].cleanup();
@@ -240,7 +241,7 @@ int main() {
 		}
 		effects[currentEffect].effect(TRUE);		
 	}
-	effects[currentEffect-1].cleanup();
+	effects[currentEffect].cleanup();
 
 
 	// END

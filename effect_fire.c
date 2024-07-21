@@ -54,7 +54,8 @@ static const UWORD bobDepth = 4;
 static UWORD mask = 0xaaaa;
 
 __attribute__((always_inline)) inline static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
-    if ( ((UWORD)(dx & 0x0f)) < ((UWORD)(x & 0x0f ))) {
+
+        if ( ((UWORD)(dx & 0x0f)) < ((UWORD)(x & 0x0f ))) {
         
         // descending never expands number of words
         UWORD srcSize = ((UWORD)((UWORD)(x+width-(UWORD)1) >> 4 ) - (UWORD)(x >> 4)) * (UWORD)2 + (UWORD)2;
@@ -161,8 +162,8 @@ __attribute__((always_inline)) inline static void Smudge(UBYTE *srcBuf, UBYTE *d
         custom->bltapt = src + screenByteWidth * 1;
         custom->bltbpt = src + screenByteWidth * 2;
         custom->bltcpt = src + screenByteWidth * 3;
-        custom->bltamod = screenByteWidth * depth - size;
-        custom->bltbmod = screenByteWidth * depth - size;
+        custom->bltamod =
+        custom->bltbmod =
         custom->bltcmod = screenByteWidth * depth - size;
         custom->bltdpt = carry;
         custom->bltdmod = 0;
