@@ -154,18 +154,6 @@ __attribute__((always_inline)) inline short MouseRight(){return !((*(volatile UW
 volatile short frameCounter = 0;
 
 
-__attribute__((always_inline)) inline USHORT* copWaitXY(USHORT *copListEnd,USHORT x,USHORT i) {
-	*copListEnd++=(i<<8)|(x<<1)|1;	//bit 1 means wait. waits for vertical position x<<8, first raster stop position outside the left 
-	*copListEnd++=0xfffe;
-	return copListEnd;
-}
-
-__attribute__((always_inline)) inline USHORT* copWaitY(USHORT* copListEnd,USHORT i) {
-	*copListEnd++=(i<<8)|4|1;	//bit 1 means wait. waits for vertical position x<<8, first raster stop position outside the left 
-	*copListEnd++=0xfffe;
-	return copListEnd;
-}
-
 UWORD* scroll = NULL;
 
 static __attribute__((interrupt)) void interruptHandler() {

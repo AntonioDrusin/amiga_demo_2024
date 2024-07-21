@@ -11,6 +11,7 @@
 #include "effect_sub.h"
 #include "hardware.h"
 #include "screen.h"
+#include "bltqueue.h"
 
 static const UWORD depth = 4;
 static const UWORD displayWidth = 320;
@@ -19,8 +20,8 @@ static const UWORD screenWidth = 320;
 static const UWORD screenByteWidth = screenWidth / 8;
 static const UWORD screenHeight = 256;
 static const UWORD vertSpeed = 4;
-static ULONG screenSize = (screenWidth/8) * screenHeight * (depth); // One extra depth for carry
-static ULONG carrySize = (screenWidth/8) * screenHeight;
+static ULONG screenSize = (ULONG)(screenWidth/8) * screenHeight * (depth); // One extra depth for carry
+static ULONG carrySize = (ULONG)(screenWidth/8) * screenHeight;
 
 // Naive 15 color can do 46 lines.
 static const UWORD fadeOutHeight = 195; 
@@ -53,7 +54,7 @@ static const UWORD bobDepth = 4;
 
 static UWORD mask = 0xaaaa;
 
-static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
+__attribute__((always_inline)) static inline void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
     if ( ((UWORD)(dx & 0x0f)) < ((UWORD)(x & 0x0f ))) {
         
         // descending never expands number of words
@@ -70,56 +71,45 @@ static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, 
         UBYTE *src = srcBuf + srcOffset + (y+(height-1)) * depth * screenByteWidth; 
         UBYTE *dst = dstBuf + dstOffset + (dy+(height-1)) * depth * screenByteWidth;
 
-        WaitBlt();
         // Calculate the last plane    
         // plane 0 in dest = minterm * bit 1 A, bit 2 B, bit 3 C
-        custom->bltcon0 = 0x94 | SRCA | SRCB | SRCC | DEST;
-        custom->bltcon1 = 0 | BLITREVERSE;
-        custom->bltafwm = 
-        custom->bltalwm = 0xffff;
-        custom->bltapt = src + screenByteWidth * 1;
-        custom->bltbpt = src + screenByteWidth * 2;
-        custom->bltcpt = src + screenByteWidth * 3;
-        custom->bltamod = 
-        custom->bltbmod = 
-        custom->bltcmod = screenByteWidth * depth - size;
-        custom->bltdmod = 0;
-        custom->bltdpt = carry + carrySize - 2;
-        custom->bltsize = ((height) << HSIZEBITS) | (size/2);
+        BltQueue_bltcon0(0x94 | SRCA | SRCB | SRCC | DEST);
+        BltQueue_bltcon1(0 | BLITREVERSE);
+        BltQueue_bltafwm(0xffff);
+        BltQueue_bltalwm(0xffff);
+        BltQueue_bltapt(src + screenByteWidth * 1);
+        BltQueue_bltbpt(src + screenByteWidth * 2);
+        BltQueue_bltcpt(src + screenByteWidth * 3);
+        BltQueue_bltamod(screenByteWidth * depth - size);  
+        BltQueue_bltbmod(screenByteWidth * depth - size);
+        BltQueue_bltcmod(screenByteWidth * depth - size);
+        BltQueue_bltdmod(0);
+        BltQueue_bltdpt(carry + carrySize - 2);
+        BltQueue_bltsize(((height) << HSIZEBITS) | (size/2));
         
-        WaitBlt();
-        custom->bltafwm = firstMask & mask;
-        custom->bltalwm = lastMask & mask;
-        custom->bltadat = mask;
-        custom->bltcon0 = 0xca | SRCB | SRCC | DEST | (shift << 12);
-        custom->bltcon1 = (shift << 12) | BLITREVERSE;
-        // SAME
-        // custom->bltbmod = 
-        // custom->bltcmod = 
-        custom->bltdmod = screenByteWidth * depth - size;
+        BltQueue_bltafwm(firstMask & mask);
+        BltQueue_bltalwm(lastMask & mask);
+        BltQueue_bltadat(mask);
+        BltQueue_bltcon0(0xca | SRCB | SRCC | DEST | (shift << 12));
+        BltQueue_bltcon1((shift << 12) | BLITREVERSE);
+        BltQueue_bltdmod(screenByteWidth * depth - size);
 
         UBYTE *shiftSrc = src + screenByteWidth * (depth-2);
         UBYTE *shiftDst = dst + screenByteWidth * (depth-1);
         for ( int i=0; i<=2; i++ ) {
-            custom->bltbpt = shiftSrc;
-            custom->bltcpt = 
-            custom->bltdpt = shiftDst;
-            custom->bltsize = (height << HSIZEBITS) | (size/2);
+            BltQueue_bltbpt(shiftSrc);
+            BltQueue_bltcpt(shiftDst); 
+            BltQueue_bltdpt(shiftDst);
+            BltQueue_bltsize((height << HSIZEBITS) | (size/2));
             shiftSrc -= screenByteWidth;
             shiftDst -= screenByteWidth;
-            WaitBlt();    
         }    
 
-        // Now move the results to bitplane 0 with masking and shifting
-        // SAME custom->bltcon0 = 0xca | SRCB | SRCC | DEST | (shift << 12);
-        // SAME custom->bltcon1 = (shift << 12) | BLITREVERSE;
-        custom->bltbmod = 0;
-        // SAME custom->bltcmod = 
-        // SAME custom->bltdmod = screenByteWidth * depth - size;
-        custom->bltbpt = carry + carrySize - 2;
-        custom->bltcpt = 
-        custom->bltdpt = dst;
-        custom->bltsize = (height << HSIZEBITS) | (size/2);
+        BltQueue_bltbmod(0);
+        BltQueue_bltbpt(carry + carrySize - 2);
+        BltQueue_bltcpt(dst);
+        BltQueue_bltdpt(dst);
+        BltQueue_bltsize((height << HSIZEBITS) | (size/2));
 
     }
     else {
@@ -151,127 +141,106 @@ static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, 
         UBYTE *src = srcBuf + srcOffset + y * depth * screenByteWidth; 
         UBYTE *dst = dstBuf + dstOffset + dy * depth * screenByteWidth;
 
-        WaitBlt();
         // Calculate the last plane    
         // plane 0 in dest = minterm * bit 1 A, bit 2 B, bit 3 C
-        custom->bltcon0 = 0x94 | SRCA | SRCB | SRCC | DEST;
-        custom->bltcon1 = 0;
-        custom->bltafwm = 
-        custom->bltalwm = 0xffff;
-        custom->bltapt = src + screenByteWidth * 1;
-        custom->bltbpt = src + screenByteWidth * 2;
-        custom->bltcpt = src + screenByteWidth * 3;
-        custom->bltamod = screenByteWidth * depth - size;
-        custom->bltbmod = screenByteWidth * depth - size;
-        custom->bltcmod = screenByteWidth * depth - size;
-        custom->bltdpt = carry;
-        custom->bltdmod = 0;
-        custom->bltsize = ((height) << HSIZEBITS) | (size/2);
+        BltQueue_bltcon0(0x94 | SRCA | SRCB | SRCC | DEST);
+        BltQueue_bltcon1(0);
+        BltQueue_bltafwm(0xffff);
+        BltQueue_bltalwm(0xffff);
+        BltQueue_bltapt(src + screenByteWidth * 1);
+        BltQueue_bltbpt(src + screenByteWidth * 2);
+        BltQueue_bltcpt(src + screenByteWidth * 3);
+        BltQueue_bltamod(screenByteWidth * depth - size);
+        BltQueue_bltbmod(screenByteWidth * depth - size);
+        BltQueue_bltcmod(screenByteWidth * depth - size);
+        BltQueue_bltdpt(carry);
+        BltQueue_bltdmod(0);
+        BltQueue_bltsize(((height) << HSIZEBITS) | (size/2));
         
-        WaitBlt();
-        custom->bltafwm = firstMask & mask;
-        custom->bltalwm = lastMask & mask;
-        custom->bltadat = mask;
-        custom->bltcon0 = 0xca | SRCB | SRCC | DEST | (aShift << 12);
-        custom->bltcon1 = (bShift << 12);
-        // SAME 
-        // custom->bltbmod = 
-        // custom->bltcmod = 
-        custom->bltdmod = screenByteWidth * depth - size;
+        BltQueue_bltafwm(firstMask & mask);
+        BltQueue_bltalwm(lastMask & mask);
+        BltQueue_bltadat(mask);
+        BltQueue_bltcon0(0xca | SRCB | SRCC | DEST | (aShift << 12));
+        BltQueue_bltcon1((bShift << 12));
+        BltQueue_bltdmod(screenByteWidth * depth - size);
 
         // Shift the last plane down first, in case we target the same buffer
         UBYTE *shiftSrc = src + screenByteWidth * (depth-2);
         UBYTE *shiftDst = dst + screenByteWidth * (depth-1);
         for ( int i=0; i<=2; i++ ) {
-            custom->bltbpt = shiftSrc;
-            custom->bltcpt = 
-            custom->bltdpt = shiftDst;
-            custom->bltsize = (height << HSIZEBITS) | (size/2);
+            BltQueue_bltbpt(shiftSrc);
+            BltQueue_bltcpt(shiftDst); 
+            BltQueue_bltdpt(shiftDst);
+            BltQueue_bltsize((height << HSIZEBITS) | (size/2));
             shiftSrc -= screenByteWidth;
             shiftDst -= screenByteWidth;
-            WaitBlt();    
         }    
 
         // Now move the results to bitplane 0 with masking and shifting
-        // SAME custom->bltcon0 = 0xca | SRCB | SRCC | DEST | (aShift << 12);
-        // SAME custom->bltcon1 = (bShift << 12);
-        custom->bltbmod = 0;
-        // SAME
-        // custom->bltcmod = 
-        // custom->bltdmod = screenByteWidth * depth - size;
-        custom->bltbpt = carry;
-        custom->bltcpt = 
-        custom->bltdpt = dst;
-        custom->bltsize = (height << HSIZEBITS) | (size/2);
+        BltQueue_bltbmod(0);
+        BltQueue_bltbpt(carry);
+        BltQueue_bltcpt(dst);
+        BltQueue_bltdpt(dst);
+        BltQueue_bltsize((height << HSIZEBITS) | (size/2));
     }
 }
 
 void BlitterBox(APTR buf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD color) {
     APTR dst = buf + (x / (UWORD)16)*(UWORD)2 + y * depth * screenByteWidth; 
-    UWORD boxByteWidth = (((x+width)/16)-(x/16))*(UWORD)2+(UWORD)2;    
+    UWORD end = x+width-1;
+    UWORD boxByteWidth = ((end/16)-(x/16))*(UWORD)2+(UWORD)2;    
     UBYTE startOffset = x & (UWORD)0x0f;
-    UBYTE endOffset = (x + width) & (UWORD)0x0f;
+    UBYTE endOffset = end & (UWORD)0x0f;
+    
+    //WaitBlt();
+    BltQueue_bltafwm(0xffff >> startOffset);
+    BltQueue_bltalwm((WORD)0x8000 >> endOffset);
+    BltQueue_bltadat(0xffff);
+    BltQueue_bltcon1(0);
+    BltQueue_bltbmod(depth*screenByteWidth - boxByteWidth);
+    BltQueue_bltdmod(depth*screenByteWidth - boxByteWidth);
 
-    WaitBlt();
-    custom->bltafwm = 0xffff >> startOffset;
-    custom->bltalwm = (WORD)0x8000 >> endOffset;
-    custom->bltadat = 0xffff;
-    custom->bltcon1 = 0;
-    custom->bltbmod = depth*screenByteWidth - boxByteWidth;
-    custom->bltdmod = depth*screenByteWidth - boxByteWidth;
     for ( int p = 0; p<depth; p++ ) {
-        if ( p ) WaitBlt();
+        //if ( p ) WaitBlt();
         if (color & 0x1 != 0) {
-            custom->bltcon0 = 0xfc | SRCB | DEST;
+            BltQueue_bltcon0(0xfc | SRCB | DEST);
         }
         else {
-            custom->bltcon0 = 0x0c | SRCB | DEST;
-        }        
-        custom->bltbpt = dst;
-        custom->bltdpt = dst;
-        custom->bltsize = ((height) << HSIZEBITS) | (boxByteWidth / 2) ;
+            BltQueue_bltcon0(0x0c | SRCB | DEST);
+        }
+        BltQueue_bltbpt(dst);
+        BltQueue_bltdpt(dst);
+        BltQueue_bltsize(((height) << HSIZEBITS) | (boxByteWidth / 2));
         color = color >> 1;
         dst += screenByteWidth;
    }
 }
 
-void CopyBuf ( BYTE *src, BYTE *dst, UWORD height) {
-
-    WaitBlt();
-    custom->bltcon0 = 0xf0 | SRCA | DEST;
-    custom->bltcon1 = 0;
-    custom->bltapt = src;
-    custom->bltdpt = dst;
-    custom->bltamod =
-    custom->bltdmod = 0;
-    custom->bltafwm =
-    custom->bltalwm = 0xffff;
-    custom->bltsize = (UWORD)((((UWORD)height * (UWORD)depth) << HSIZEBITS) | (screenByteWidth/2));
-
+void CopyBuf ( UBYTE *src, UBYTE *dst, UWORD height) {
+    //WaitBlt();
+    BltQueue_bltcon0(0xf0 | SRCA | DEST);
+    BltQueue_bltcon1(0);
+    BltQueue_bltapt(src);
+    BltQueue_bltdpt(dst);
+    BltQueue_bltamod(0);
+    BltQueue_bltdmod(0);
+    BltQueue_bltafwm(0xffff);
+    BltQueue_bltalwm(0xffff);
+    BltQueue_bltsize((UWORD)(((UWORD)height * (UWORD)depth) << HSIZEBITS) | ((UWORD)screenByteWidth / 2));
 }
 
-
-void ScreenClear(APTR buf) {
-    WaitBlt();
-    custom->bltcon0 = 0x00 | DEST;
-    custom->bltcon1 = 0;
-    custom->bltafwm = 0xffff;
-    custom->bltalwm = 0xffff;
-    custom->bltdpt = buf;
-    custom->bltdmod = 0;
-    custom->bltsize = (UWORD)(((UWORD)screenHeight * (UWORD)depth) << HSIZEBITS) | ((UWORD)screenByteWidth / 2);
-}
 
 // Exported functions
 void Fire_InitEffect() {
+
     buf0 = AllocMem(screenSize, MEMF_CHIP | MEMF_CLEAR);
     buf1 = AllocMem(screenSize, MEMF_CHIP | MEMF_CLEAR);
     carry = AllocMem(carrySize, MEMF_CHIP | MEMF_CLEAR);
     buf = buf0;
-    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
+    custom->copcon = 0x02;
     WaitBlt();
-    //custom->dmacon = DMAF_BLITHOG;
-   	SetupScreenComplete(buf0, 4, displayWidth, displayHeight);
+    BltQueue_init(); // sets up cop2lc so we jump at it at the end.
+   	SetupScreenComplete(buf0, 4, displayWidth, displayHeight, TRUE);
     mask = 0xaaaa;
 }
 
@@ -290,10 +259,12 @@ void ShaderBob_InitEffect() {
 
 
 void Fire_FreeEffect() {
+    custom->copcon = 0x00;
+    CleanupScreen();
     FreeMem(buf0, screenSize);
     FreeMem(buf1, screenSize);
     FreeMem(carry, carrySize);
-    CleanupScreen();
+    BltQueue_cleanup();
 }
 
 
@@ -350,13 +321,15 @@ WORD getWaveX() {
 void FireWaitLine(USHORT line) {
 	while (1) {
 		volatile ULONG vpos=*(volatile ULONG*)0xDFF004;
-		if(((vpos >> 8) & 511) == line)
+		if(((vpos >> 8) & 0x1ff) == line)
 			break;
 	}
 }
 
 
 BOOL Fire_CalcEffect(BOOL exit) {
+    FireWaitLine(0);
+
     UBYTE *frontBuf;
     if ( buf == buf0 ) {
         buf = buf1;
@@ -368,13 +341,10 @@ BOOL Fire_CalcEffect(BOOL exit) {
     }
     SetPlanes(frontBuf); 
 
-    FireWaitLine(0x0);   
+    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
     
-
     mask = mask << 1 | (mask & 0x8000 ? 1:0);
     //mask = 0xffff;
-
-
 
     // 3 boxes at the bottom
     // 20px - 280px - 20px;
@@ -384,10 +354,12 @@ BOOL Fire_CalcEffect(BOOL exit) {
     const UWORD h = 27;
     UWORD x;
     UWORD w;
-
-    CopyBuf(frontBuf, buf, 90 + heightJump);
     UWORD y = 90;
+    
+    custom->dmacon = DMAF_BLITHOG;
 
+    BltQueue_begin();
+    CopyBuf(frontBuf, buf, 90);
 
     w = width / 3;    
     x = margin;
@@ -404,27 +376,32 @@ BOOL Fire_CalcEffect(BOOL exit) {
         Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
         x += w;
     }
-     
+    BltQueue_fire();
+    
     // // 12 boxes above those
-    // y -= heightJump;
-    // w = (width) / 12;
-    // x = margin;
-    // for ( UWORD i=0; i<12; i++) {
-    //     Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
-    //     x += w;
-    // }
+    y -= heightJump;
+    w = (width) / 12;
+    x = margin;
+    for ( UWORD i=0; i<12; i++) {
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
 
     // // 24 boxes above those
-    // y -= heightJump*2;
-    // w = (width) / 24;
-    // x = margin;
-    // for ( UWORD i=0; i<25; i++) {
-    //     Smudge(buf, buf, x, y, w, h*2, x + getWaveX(), y-getWaveY());
-    //     x += w;
-    // }
+    y -= heightJump*2;
+    w = (width) / 24;
+    x = margin;
+    // 25
+    for ( UWORD i=0; i<25; i++) {
+        Smudge(buf, buf, x, y, w, h*2, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
 
+    BlitterBox(buf, 0, 90+10, 320 , heightJump, 3);
+    BltQueue_end();
+    custom->dmacon = DMAF_SETCLR | DMAF_BLITHOG;
+    BltQueue_wait();
 
-    BlitterBox(buf, 0, 90+10, 320, heightJump, 3);
 
 
     frame++;

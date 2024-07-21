@@ -58,19 +58,19 @@ static const UWORD colors[] = {
     0x000, // 0
     0x53e, // 7
     0x43f, // 6
-	0x60a, // 13
+	0x62c, // 13
     0x52e, // 8
     0x42d, // 5
     0x218, // 3
-    0x60a, // 12
+    0x61b, // 12
     0x103, // 1
     0x52e, // 8
     0x52d, // 9
     0x32a, // 4
     0x115, // 2
     0x51c, // 10
-    0x61b, // 11
-    0x60a, // 13
+    0x60a, // 11
+    0x62c, // 13
 };
 
 static const UWORD colors1[] = {
@@ -99,7 +99,8 @@ static const UWORD lineSize = 320/8;
 
 
 // width ignored
-void SetupScreenComplete(APTR image, UWORD depth, UWORD width, UWORD height) {
+// copper2 is the second
+void SetupScreenComplete(APTR image, UWORD depth, UWORD width, UWORD height, BOOL jumpToCopper2) {
 	screenDepth = depth;
    	copper1 = (USHORT*)AllocMem(1024, MEMF_CHIP);
 	USHORT* copPtr = copper1;
@@ -130,8 +131,16 @@ void SetupScreenComplete(APTR image, UWORD depth, UWORD width, UWORD height) {
     copPtr = copSetPlanes(0, copPtr, planes, screenDepth);
 
    	// set colors
-	for(int a=0; a < 16; a++)
-		copPtr = copSetColor(copPtr, a, colors[a]);
+	for(int a=0; a < 16; a++) {
+		custom->color[a] = colors[a];
+		//copPtr = copSetColor(copPtr, a, colors[a]);
+	}
+
+	// jump to copper list 2 if needed
+	if ( jumpToCopper2 ) {
+		*copPtr++=offsetof(struct Custom, copjmp2);
+		*copPtr++=0x7fff;
+	}
 
     // terminate copper list
     *copPtr++ = 0xffff;
@@ -144,7 +153,7 @@ void SetupScreenComplete(APTR image, UWORD depth, UWORD width, UWORD height) {
 }
 
 void SetupScreen(APTR image, UWORD depth) {
-	SetupScreenComplete(image, depth, 0, 160);
+	SetupScreenComplete(image, depth, 0, 160, FALSE);
 }
 
 
