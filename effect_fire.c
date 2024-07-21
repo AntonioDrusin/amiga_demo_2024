@@ -14,7 +14,7 @@
 
 static const UWORD depth = 4;
 static const UWORD displayWidth = 320;
-static const UWORD displayHeight = 160;
+static const UWORD displayHeight = 100;
 static const UWORD screenWidth = 320;
 static const UWORD screenByteWidth = screenWidth / 8;
 static const UWORD screenHeight = 256;
@@ -376,14 +376,14 @@ BOOL Fire_CalcEffect(BOOL exit) {
 
     // 3 boxes at the bottom
     // 20px - 280px - 20px;
-    const UWORD width = 280;
-    const UWORD margin = (320-280)/2;
+    const UWORD width = 304;
+    const UWORD margin = (320-width)/2;
     const UWORD heightJump = 17;
     const UWORD h = 27;
     UWORD x;
     UWORD w;
 
-    CopyBuf(frontBuf, buf, 90 + heightJump);
+    CopyBuf(frontBuf, buf, 90 + heightJump - 8);
     UWORD y = 90;
 
 
