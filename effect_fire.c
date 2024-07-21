@@ -318,17 +318,17 @@ WORD getWaveX() {
     return (wave0[ix & 0x0f]);
 }
 
-void FireWaitLine(USHORT line) {
+void FireWaitTof() {
 	while (1) {
-		volatile ULONG vpos=*(volatile ULONG*)0xDFF004;
-		if(((vpos >> 8) & 0x1ff) == line)
+		volatile ULONG vpos=*((volatile ULONG*)0xDFF004);
+		if((vpos & 0x0001ff00) == 0)
 			break;
 	}
 }
 
 
 BOOL Fire_CalcEffect(BOOL exit) {
-    FireWaitLine(0);
+    FireWaitTof();
 
     UBYTE *frontBuf;
     if ( buf == buf0 ) {
@@ -367,6 +367,7 @@ BOOL Fire_CalcEffect(BOOL exit) {
         Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
         x += w;
     }
+    BltQueue_fire();
 
     // 6 boxes above that
     y -= heightJump;
@@ -376,7 +377,6 @@ BOOL Fire_CalcEffect(BOOL exit) {
         Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
         x += w;
     }
-    BltQueue_fire();
     
     // // 12 boxes above those
     y -= heightJump;
