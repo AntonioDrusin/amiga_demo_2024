@@ -53,7 +53,7 @@ static const UWORD bobDepth = 4;
 
 static UWORD mask = 0xaaaa;
 
-static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
+__attribute__((always_inline)) inline static void Smudge(UBYTE *srcBuf, UBYTE *dstBuf, UWORD x, UWORD y, UWORD width, UWORD height, UWORD dx, UWORD dy) {
     if ( ((UWORD)(dx & 0x0f)) < ((UWORD)(x & 0x0f ))) {
         
         // descending never expands number of words
@@ -374,8 +374,6 @@ BOOL Fire_CalcEffect(BOOL exit) {
     mask = mask << 1 | (mask & 0x8000 ? 1:0);
     //mask = 0xffff;
 
-
-
     // 3 boxes at the bottom
     // 20px - 280px - 20px;
     const UWORD width = 280;
@@ -405,23 +403,23 @@ BOOL Fire_CalcEffect(BOOL exit) {
         x += w;
     }
      
-    // // 12 boxes above those
-    // y -= heightJump;
-    // w = (width) / 12;
-    // x = margin;
-    // for ( UWORD i=0; i<12; i++) {
-    //     Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
-    //     x += w;
-    // }
+    // 12 boxes above those
+    y -= heightJump;
+    w = (width) / 12;
+    x = margin;
+    for ( UWORD i=0; i<12; i++) {
+        Smudge(buf, buf, x, y, w, h, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
 
-    // // 24 boxes above those
-    // y -= heightJump*2;
-    // w = (width) / 24;
-    // x = margin;
-    // for ( UWORD i=0; i<25; i++) {
-    //     Smudge(buf, buf, x, y, w, h*2, x + getWaveX(), y-getWaveY());
-    //     x += w;
-    // }
+    // 24 boxes above those
+    y -= heightJump*2;
+    w = (width) / 24;
+    x = margin;
+    for ( UWORD i=0; i<25; i++) {
+        Smudge(buf, buf, x, y, w, h*2, x + getWaveX(), y-getWaveY());
+        x += w;
+    }
 
 
     BlitterBox(buf, 0, 90+10, 320, heightJump, 3);
